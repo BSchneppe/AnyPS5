@@ -46,14 +46,8 @@ std::uint32_t APS5_VABI sceAgcDcbDrawIndexIndirectGetSize() {
 }
 
 uint32_t* APS5_VABI sceAgcDcbDrawIndexIndirectMulti(CommandBuffer* buf, uint32_t data_offset_in_bytes, uint32_t count_indirect, uint32_t max_count_or_count, const volatile void* count_addr, uint32_t stride_in_bytes, uint64_t modifier) {
-    Agc::Command::CheckBits(count_indirect, 1, __func__);
-    Agc::Command::Require((data_offset_in_bytes & 3u) == 0 && (stride_in_bytes & 3u) == 0 && stride_in_bytes >= 20, __func__, "invalid indirect draw offset or stride");
-    const auto address = reinterpret_cast<std::uintptr_t>(count_addr);
-    if (count_indirect != 0) {
-        Agc::Command::CheckAddress(address, 4, __func__);
-    } else {
-        Agc::Command::Require(address == 0, __func__, "count address supplied for a direct draw count");
-    }
+    count_indirect &= 1u;
+    const auto address = static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(count_addr));
     const auto offsets = Agc::Command::DrawPatchOffsets(modifier, __func__);
     const auto low = static_cast<std::uint32_t>(modifier);
     const auto control = Agc::Command::DrawIndexLocation(modifier) | ((low & 0x10u) << 23u) | (count_indirect << 30u) | ((low & 8u) << 28u);

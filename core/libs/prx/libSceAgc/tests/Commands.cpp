@@ -186,9 +186,12 @@ void testIndexedIndirectDraws() {
     check(sceAgcDcbDrawIndexIndirectMultiGetSize() == expectedMulti.size() * sizeof(std::uint32_t), "indexed indirect multi draw size differs from its packets");
     const auto before = storage.words;
     expectFailure([&] { sceAgcDcbDrawIndexIndirect(&storage.buffer, 2, 0); });
-    expectFailure([&] { sceAgcDcbDrawIndexIndirectMulti(&storage.buffer, 0, 1, 8, &count, 16, 0); });
-    expectFailure([&] { sceAgcDcbDrawIndexIndirectMulti(&storage.buffer, 0, 0, 8, &count, 20, 0); });
     check(storage.words == before, "invalid indexed indirect draw modified packet memory");
+    Storage unchecked;
+    const auto* direct = sceAgcDcbDrawIndexIndirectMulti(&unchecked.buffer, 6, 2, 8, &count, 6, 0);
+    check(direct[4] == 6 && (direct[7] & 0x40000000u) == 0 && direct[9] == static_cast<std::uint32_t>(address) && direct[10] == static_cast<std::uint32_t>(address >> 32u) && direct[11] == 6, "indexed indirect multi draw did not encode an unaligned offset, a direct count with an address, or a short stride");
+    const auto* nonIndexed = sceAgcDcbDrawIndirectMulti(&unchecked.buffer, 6, 2, 8, &count, 6, 0);
+    check(nonIndexed[4] == 6 && nonIndexed[9] == static_cast<std::uint32_t>(address) && nonIndexed[11] == 6, "indirect multi draw did not encode an unaligned offset, a direct count with an address, or a short stride");
 }
 
 void testTagHeaders() {
