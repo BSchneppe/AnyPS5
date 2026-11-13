@@ -490,15 +490,16 @@ void testIndexIndirectArgs() {
 
 void testIndirectBase() {
     Storage storage;
-    alignas(8) std::uint32_t arguments[4]{};
+    alignas(16) std::uint32_t arguments[4]{};
     const auto address = reinterpret_cast<std::uintptr_t>(arguments);
     const auto* bound = sceAgcDcbSetBaseIndirectArgs(&storage.buffer, 0, arguments);
     check(bound[1] == 1 && bound[2] == static_cast<std::uint32_t>(address) && bound[3] == static_cast<std::uint32_t>(address >> 32u), "indirect base address mismatch");
     const auto* cleared = sceAgcDcbSetBaseIndirectArgs(&storage.buffer, 1, nullptr);
     check(cleared == bound + 4 && (cleared[0] & 2u) != 0 && cleared[1] == 1 && cleared[2] == 0 && cleared[3] == 0, "indirect base was not cleared");
-    const auto before = storage.words;
-    expectFailure([&] { sceAgcDcbSetBaseIndirectArgs(&storage.buffer, 0, reinterpret_cast<const volatile void*>(address + 4)); });
-    check(storage.words == before, "misaligned indirect base modified packet memory");
+    const auto* misaligned = sceAgcDcbSetBaseIndirectArgs(&storage.buffer, 0, reinterpret_cast<const volatile void*>(address + 4));
+    check(misaligned[0] == 0xc0021100u && misaligned[2] == static_cast<std::uint32_t>(address) && misaligned[3] == static_cast<std::uint32_t>(address >> 32u), "misaligned indirect base was not aligned down to 16 bytes");
+    const auto* wide = sceAgcDcbSetBaseIndirectArgs(&storage.buffer, 3, arguments);
+    check(wide[0] == (0xc0021100u | 6u), "the shader type was not shifted into the header as the console does");
 }
 
 void testContextState() {
