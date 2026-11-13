@@ -196,12 +196,14 @@ void testQueueMemSemaphore(QueueMemSemaphore write) {
         CommandBuffer buffer{words.data(), words.data() + words.size(), words.data(), words.data() + words.size(), nullptr, nullptr, 0};
         const auto* packet = write(&buffer, semaphore, 0, 1, 6);
         check(packet == words.data(), "packet address mismatch");
-        check(packet[0] == 0xc0023900u, "MEM_SEMAPHORE header opcode mismatch");
-        check(packet[1] == 0x2f221d98u, "MEM_SEMAPHORE address low mismatch");
-        check(packet[2] == 0x10u, "MEM_SEMAPHORE address high mismatch");
-        check(packet[3] == 0xc0100000u, "MEM_SEMAPHORE signal control word mismatch");
-        check(buffer.cursor_up == words.data() + 4, "cursor did not advance by 4 words");
-        check(words[4] == 0xdeadbeefu, "words past packet modified");
+        check(packet[0] == 0xc0027900u && packet[1] == 0x342u, "MEM_SEMAPHORE tag wrapper mismatch");
+        check(packet[2] == 0xc9020010u && packet[3] == 0x2f221d98u, "MEM_SEMAPHORE tag address mismatch");
+        check(packet[4] == 0xc0023900u, "MEM_SEMAPHORE header opcode mismatch");
+        check(packet[5] == 0x2f221d90u, "MEM_SEMAPHORE address low mismatch");
+        check(packet[6] == 0x10u, "MEM_SEMAPHORE address high mismatch");
+        check(packet[7] == 0xc0100000u, "MEM_SEMAPHORE signal control word mismatch");
+        check(buffer.cursor_up == words.data() + 8, "cursor did not advance by 8 words");
+        check(words[8] == 0xdeadbeefu, "words past packet modified");
     }
 
     {
@@ -209,14 +211,22 @@ void testQueueMemSemaphore(QueueMemSemaphore write) {
         words.fill(0xdeadbeefu);
         CommandBuffer buffer{words.data(), words.data() + words.size(), words.data(), words.data() + words.size(), nullptr, nullptr, 0};
         const auto* packet = write(&buffer, semaphore, 1, 0, 7);
-        check(packet[3] == 0xe0010000u, "MEM_SEMAPHORE wait control word mismatch");
+        check(packet[7] == 0xe0010000u, "MEM_SEMAPHORE wait control word mismatch");
     }
 
-    std::array<std::uint32_t, 16> words{};
-    CommandBuffer buffer{words.data(), words.data() + words.size(), words.data(), words.data() + words.size(), nullptr, nullptr, 0};
-    expectFailure([&] { write(&buffer, reinterpret_cast<const volatile void*>(1ull), 0, 1, 6); });
-    expectFailure([&] { write(&buffer, semaphore, 0, 1, 5); });
-    expectFailure([&] { write(&buffer, semaphore, 2, 0, 7); });
+    {
+        std::array<std::uint32_t, 16> words{};
+        CommandBuffer buffer{words.data(), words.data() + words.size(), words.data(), words.data() + words.size(), nullptr, nullptr, 0};
+        const auto* packet = write(&buffer, reinterpret_cast<const volatile void*>(0x0001abcd1234567cull), 0x44, 0x33, 0x44);
+        check(packet[2] == 0xc902abcdu && packet[3] == 0x1234567cu, "MEM_SEMAPHORE masked tag mismatch");
+        check(packet[5] == 0x12345670u && packet[6] == 0x0001abcdu, "MEM_SEMAPHORE masked address mismatch");
+        check(packet[7] == 0x80100000u, "MEM_SEMAPHORE masked control word mismatch");
+    }
+
+    std::array<std::uint32_t, 4> small{};
+    CommandBuffer buffer{small.data(), small.data() + small.size(), small.data(), small.data() + small.size(), nullptr, nullptr, 0};
+    expectFailure([&] { write(&buffer, semaphore, 0, 1, 6); });
+    expectFailure([&] { write(nullptr, semaphore, 0, 1, 6); });
 }
 
 }

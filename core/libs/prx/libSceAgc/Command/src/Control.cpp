@@ -27,12 +27,18 @@ std::uint32_t* WritePredication(CommandBuffer* buffer, std::uint8_t condition, s
 }
 
 std::uint32_t* WriteMemSemaphore(CommandBuffer* buffer, const volatile void* address, std::uint8_t waitForMailbox, std::uint8_t signalType, std::uint8_t operation, const char* function) {
-    CheckBits(waitForMailbox, 1, function);
-    CheckBits(signalType, 1, function);
-    Require(operation == 6 || operation == 7, function, "invalid memory semaphore operation");
-    const auto guestAddress = reinterpret_cast<std::uintptr_t>(address);
-    CheckAddress(guestAddress, 8, function);
-    return Emit(buffer, 0x39u, {static_cast<std::uint32_t>(guestAddress), static_cast<std::uint32_t>(guestAddress >> 32u), (static_cast<std::uint32_t>(operation) << 29u) | (static_cast<std::uint32_t>(signalType) << 20u) | (static_cast<std::uint32_t>(waitForMailbox) << 16u)}, function);
+    const auto guestAddress = static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(address));
+    const auto maskedAddress = guestAddress & ~0xfULL;
+    auto* packet = Allocate(buffer, 8, function);
+    packet[0] = Header(0x79u, 4);
+    packet[1] = 0x342u;
+    packet[2] = 0xc9020000u | static_cast<std::uint32_t>((guestAddress >> 32u) & 0xffffu);
+    packet[3] = static_cast<std::uint32_t>(guestAddress);
+    packet[4] = Header(0x39u, 4);
+    packet[5] = static_cast<std::uint32_t>(maskedAddress);
+    packet[6] = static_cast<std::uint32_t>(maskedAddress >> 32u);
+    packet[7] = ((static_cast<std::uint32_t>(operation) & 7u) << 29u) | ((static_cast<std::uint32_t>(signalType) & 1u) << 20u) | ((static_cast<std::uint32_t>(waitForMailbox) & 1u) << 16u);
+    return packet;
 }
 
 }
